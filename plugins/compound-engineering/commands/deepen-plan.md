@@ -179,19 +179,49 @@ find .claude/docs -name "*.md" -type f 2>/dev/null
 find ~/.claude/docs -name "*.md" -type f 2>/dev/null
 ```
 
-**Step 2: Grep to list all .md files**
+**Step 2: Read frontmatter of each learning to filter**
 
-```bash
-# Get list of all learning files
-ls -la docs/solutions/**/*.md 2>/dev/null
+Each learning file has YAML frontmatter with metadata. Read the first ~20 lines of each file to get:
 
-# Or use find with full paths
-find docs/solutions -name "*.md" -exec echo {} \;
+```yaml
+---
+title: "N+1 Query Fix for Briefs"
+category: performance-issues
+tags: [activerecord, n-plus-one, includes, eager-loading]
+module: Briefs
+symptom: "Slow page load, multiple queries in logs"
+root_cause: "Missing includes on association"
+---
 ```
 
-**Step 3: For EACH .md file found, spawn a sub-agent**
+**For each .md file, quickly scan its frontmatter:**
 
-For EVERY markdown file discovered:
+```bash
+# Read first 20 lines of each learning (frontmatter + summary)
+head -20 docs/solutions/**/*.md
+```
+
+**Step 3: Filter - only spawn sub-agents for LIKELY relevant learnings**
+
+Compare each learning's frontmatter against the plan:
+- `tags:` - Do any tags match technologies/patterns in the plan?
+- `category:` - Is this category relevant? (e.g., skip deployment-issues if plan is UI-only)
+- `module:` - Does the plan touch this module?
+- `symptom:` / `root_cause:` - Could this problem occur with the plan?
+
+**SKIP learnings that are clearly not applicable:**
+- Plan is frontend-only → skip `database-migrations/` learnings
+- Plan is Python → skip `rails-specific/` learnings
+- Plan has no auth → skip `authentication-issues/` learnings
+
+**SPAWN sub-agents for learnings that MIGHT apply:**
+- Any tag overlap with plan technologies
+- Same category as plan domain
+- Similar patterns or concerns
+
+**Step 4: Spawn sub-agents for filtered learnings**
+
+For each learning that passes the filter:
 
 ```
 Task general-purpose: "
@@ -200,39 +230,38 @@ LEARNING FILE: [full path to .md file]
 1. Read this learning file completely
 2. This learning documents a previously solved problem
 
-Check if this learning applies to ANY part of this plan:
+Check if this learning applies to this plan:
 
 ---
 [full plan content]
 ---
 
-If the learning IS relevant:
+If relevant:
 - Explain specifically how it applies
-- Quote the key insight or solution from the learning
-- Suggest exactly where/how to incorporate it into the plan
+- Quote the key insight or solution
+- Suggest where/how to incorporate it
 
-If NOT relevant:
-- Say 'Not applicable: [brief reason]'
+If NOT relevant after deeper analysis:
+- Say 'Not applicable: [reason]'
 "
 ```
 
-**CRITICAL: Spawn ALL sub-agents in PARALLEL**
-- Find 10 learning files? Spawn 10 sub-agents
-- Find 50 learning files? Spawn 50 sub-agents
-- 1 sub-agent per .md file, all running simultaneously
-
-**Example:**
+**Example filtering:**
 ```
-# If find returns:
-docs/solutions/performance-issues/n-plus-one-queries.md
-docs/solutions/debugging-patterns/turbo-stream-debugging.md
-docs/solutions/configuration-fixes/redis-connection-pool.md
+# Found 15 learning files, plan is about "Rails API caching"
 
-# Spawn 3 parallel sub-agents:
-Task general-purpose: "LEARNING FILE: docs/solutions/performance-issues/n-plus-one-queries.md ..."
-Task general-purpose: "LEARNING FILE: docs/solutions/debugging-patterns/turbo-stream-debugging.md ..."
-Task general-purpose: "LEARNING FILE: docs/solutions/configuration-fixes/redis-connection-pool.md ..."
+# SPAWN (likely relevant):
+docs/solutions/performance-issues/n-plus-one-queries.md      # tags: [activerecord] ✓
+docs/solutions/performance-issues/redis-cache-stampede.md    # tags: [caching, redis] ✓
+docs/solutions/configuration-fixes/redis-connection-pool.md  # tags: [redis] ✓
+
+# SKIP (clearly not applicable):
+docs/solutions/deployment-issues/heroku-memory-quota.md      # not about caching
+docs/solutions/frontend-issues/stimulus-race-condition.md    # plan is API, not frontend
+docs/solutions/authentication-issues/jwt-expiry.md           # plan has no auth
 ```
+
+**Spawn sub-agents in PARALLEL for all filtered learnings.**
 
 **These learnings are institutional knowledge - applying them prevents repeating past mistakes.**
 
