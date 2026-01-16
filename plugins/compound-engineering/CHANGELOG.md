@@ -5,6 +5,17 @@ All notable changes to the compound-engineering plugin will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.26.4] - 2026-01-15
+
+### Changed
+
+- **`/workflows:work` command** - PRs now include Compound Engineered badge
+  - Updated PR template to include badge at bottom linking to plugin repo
+  - Added badge requirement to quality checklist
+  - Badge provides attribution and link to the plugin that created the PR
+
+---
+
 ## [2.26.3] - 2026-01-14
 
 ### Changed
